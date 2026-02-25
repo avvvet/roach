@@ -8,7 +8,7 @@ dataset/data/train/audio/
 dataset/data/test/audio/
 
 # raw 
-dataset/raw
+dataset/raw/
 
 # Cache
 dataset/cache/
