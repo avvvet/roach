@@ -1,0 +1,22 @@
+# Models - too large for git
+models/
+finetuned-model/
+
+
+# Dataset audio - too large
+dataset/data/train/audio/
+dataset/data/test/audio/
+
+# raw 
+dataset/raw
+
+# Cache
+dataset/cache/
+__pycache__/
+*.pyc
+
+# Checkpoints
+finetuned-model/checkpoint-*/
+
+# Env
+.env

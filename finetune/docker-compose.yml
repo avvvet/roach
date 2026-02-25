@@ -1,0 +1,28 @@
+services:
+  finetune:
+    build: .
+    container_name: whisper-finetune
+    volumes:
+      - ../dataset:/app/dataset
+      - ../finetuned-model:/app/output
+      - ../models:/root/.cache/huggingface/hub
+    
+    environment:
+      - BASE_MODEL=openai/whisper-small
+      - LANGUAGE=amharic
+      - EPOCHS=20
+      - BATCH_SIZE=1
+      - DATASET_DIR=/app/dataset/data
+      - OUTPUT_DIR=/app/output
+      - HF_DATASETS_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - HF_DATASETS_CACHE=/app/dataset/cache
+  
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
