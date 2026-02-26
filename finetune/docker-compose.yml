@@ -1,7 +1,7 @@
 services:
   finetune:
     build: .
-    container_name: whisper-finetune
+    container_name: ruach-finetune
     volumes:
       - ../dataset:/app/dataset
       - ../finetuned-model:/app/output
