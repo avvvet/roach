@@ -8,7 +8,7 @@ services:
       - ../models:/root/.cache/huggingface/hub
     
     environment:
-      - BASE_MODEL=openai/whisper-small
+      - BASE_MODEL=openai/whisper-medium    # was whisper-small
       - LANGUAGE=amharic
       - EPOCHS=20
       - BATCH_SIZE=1

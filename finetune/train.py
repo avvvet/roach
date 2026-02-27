@@ -2,6 +2,16 @@
 Whisper Fine-tuning for Amharic (am)
 Based on: https://huggingface.co/blog/fine-tune-whisper
 Adapted for local dataset with metadata.csv format
+
+Changes from whisper-small run:
+  - BASE_MODEL default → whisper-medium
+  - per_device_train_batch_size → 4 (medium fits on 3090 with batch 4)
+  - gradient_accumulation_steps → 2 (effective batch = 8, same as before)
+  - early_stopping_patience → 3 (stop if no WER improvement for 3 epochs)
+  - save_total_limit → 3 (keep only top 3 checkpoints, saves disk)
+  - dataloader_num_workers → 4 (faster CPU data loading)
+  - warmup_steps → 500 (medium needs longer warmup)
+  - fp16 → True (medium fits in fp16 on 3090)
 """
 
 import os
@@ -21,11 +31,12 @@ from transformers import (
     WhisperForConditionalGeneration,
     Seq2SeqTrainingArguments,
     Seq2SeqTrainer,
+    EarlyStoppingCallback,
 )
 
 # ─── Config from environment ───────────────────────────────────────────────────
 os.environ["HF_DATASETS_CACHE"] = "/app/dataset/cache"
-BASE_MODEL  = os.getenv("BASE_MODEL",  "openai/whisper-small")
+BASE_MODEL  = os.getenv("BASE_MODEL",  "openai/whisper-medium")
 LANGUAGE    = os.getenv("LANGUAGE",    "amharic")
 EPOCHS      = int(os.getenv("EPOCHS",  "20"))
 BATCH_SIZE  = int(os.getenv("BATCH_SIZE", "4"))
@@ -141,25 +152,41 @@ model.generation_config.task = "transcribe"
 model.generation_config.forced_decoder_ids = None
 
 # ─── Training arguments ────────────────────────────────────────────────────────
-# Tuned for 4GB VRAM (RTX 3050)
 training_args = Seq2SeqTrainingArguments(
     output_dir=OUTPUT_DIR,
     num_train_epochs=EPOCHS,
-    per_device_train_batch_size=1,
+
+    # Batch — tuned for RTX 3090 24GB with whisper-medium
+    per_device_train_batch_size=BATCH_SIZE,
     per_device_eval_batch_size=1,
-    gradient_accumulation_steps=8,       # effective batch = BATCH_SIZE * 2
+    gradient_accumulation_steps=2,       # effective batch = BATCH_SIZE * 2 = 8
+
+    # Learning rate — medium needs more warmup than small
     learning_rate=1e-5,
-    warmup_steps=10,
-    fp16=True,                           # half precision — saves VRAM
-    optim="adafactor", 
+    warmup_steps=500,
+
+    # Memory
+    fp16=True,                           # whisper-medium fits in fp16 on 3090
+    optim="adafactor",
+
+    # Speed — more workers feed GPU faster
+    dataloader_num_workers=4,
+
+    # Evaluation
     evaluation_strategy="epoch",
     save_strategy="epoch",
     logging_steps=5,
+
+    # Generation
     predict_with_generate=True,
     generation_max_length=225,
+
+    # Best model + early stopping
     load_best_model_at_end=True,
     metric_for_best_model="wer",
     greater_is_better=False,
+    save_total_limit=3,                  # keep only 3 best checkpoints
+
     report_to="none",                    # no wandb/tensorboard needed
 )
 
@@ -172,6 +199,9 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
+    callbacks=[
+        EarlyStoppingCallback(early_stopping_patience=3)  # stop if WER doesn't improve for 3 epochs
+    ],
 )
 
 # ─── Train ─────────────────────────────────────────────────────────────────────
